@@ -59,7 +59,7 @@ pub struct EmbeddingRequest {
     /// API to see all of your available models, or see our
     /// [Model overview](https://platform.openai.com/docs/models/overview)
     /// for descriptions of them.
-    pub model: String,
+    pub url: String,
 
     /// Input text to get embeddings for, encoded as a string or array of tokens.
     /// To get embeddings for multiple inputs in a single request, pass an array

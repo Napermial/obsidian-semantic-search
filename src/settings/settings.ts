@@ -2,7 +2,7 @@ import SemanticSearch from "main";
 import { App, PluginSettingTab, Setting, TextComponent } from "obsidian";
 
 export interface semanticSearchSettings {
-	apiKey: string;
+	url: string;
 	ignoredFolders: string;
 	sectionDelimeterRegex: string;
 	numBatches: number;

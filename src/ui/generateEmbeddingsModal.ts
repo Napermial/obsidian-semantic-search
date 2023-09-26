@@ -15,15 +15,11 @@ export class GenerateEmbeddingsModal extends Modal {
      const contentEl = this.contentEl;
      const estimate_container = contentEl.createDiv({cls: "ss-estimate-container"});
      const exists_container = contentEl.createDiv();
-     const estimate_text = estimate_container.createDiv();
      const nfiles_text = estimate_container.createDiv();
-     estimate_text.setText("Processing estimated cost of query: ...");
 
      try {
        const { nfiles, cost } = await this.wasmGenerateEmbeddingsCommand.get_input_cost_estimate();
        const exists = await this.wasmGenerateEmbeddingsCommand.check_embedding_file_exists();
-
-       estimate_text.setText(`Estimated cost of query: ${cost}`);
 	   if (nfiles == 0) {
 		   nfiles_text.setText(`Detected 0 files that are new or modified.`)
 		   exists_container.createDiv({text: "Make sure to run 'Generate Input' after modifications.", cls: "ss-exists-text"})

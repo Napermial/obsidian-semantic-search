@@ -183,54 +183,31 @@ pub struct Suggestions {
 pub async fn get_suggestions(app: &obsidian::App, api_key: JsString, query: JsString) -> Result<JsValue, JsError> {
     let query_string = query.as_string().unwrap();
     let file_processor = FileProcessor::new(app.vault());
-    let client = Client::new(api_key.as_string().expect("API Key is invalid"));
+    let client = Client::new();
     let query_cmd = QueryCommand { file_processor, client };
     let mut ranked_suggestions = query_cmd.get_similarity(query_string).await?;
     ranked_suggestions.truncate(10);
     Ok(serde_wasm_bindgen::to_value(&ranked_suggestions)?)
 }
 
-#[wasm_bindgen]
-pub fn get_query_cost_estimate(query: &str) -> f32 {
-    const TOKEN_COST: f32 = 0.0004 / 1000.0;
-    let tokens = cl100k_base().unwrap().encode_with_special_tokens(query); 
-    let tokens_length = tokens.len() as f32;
-    return TOKEN_COST * tokens_length;
-}
 
 #[derive(Debug, Clone)]
-/// Client is a container for api key, base url, organization id
 pub struct Client {
-    api_key: String,
     api_base: String,
-    org_id: String,
 }
 
 /// Default v1 API base url
-pub const API_BASE: &str = "https://api.openai.com/v1";
-/// Name for organization header
-pub const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
+pub const API_BASE: &str = "http://localhost:100554";
 
 impl Client {
     pub fn api_base(&self) -> &str {
         &self.api_base
     }
 
-    pub fn api_key(&self) -> &str {
-        &self.api_key
-    }
-
     fn new(api_key: String) -> Self{
-        Self { api_key, api_base: API_BASE.to_string(), org_id: Default::default() }
+        Self { api_base: API_BASE.to_string() }
     }
 
-    fn headers(&self) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        if !self.org_id.is_empty() {
-            headers.insert(ORGANIZATION_HEADER, self.org_id.as_str().parse().unwrap());
-        }
-        headers
-    }
 
     pub async fn get_embedding(&self, input: EmbeddingInput) -> Result<EmbeddingResponse, SemanticSearchError> {
         let request = self.create_embedding_request(input)?;
@@ -240,9 +217,8 @@ impl Client {
 
     fn create_embedding_request(&self, input: EmbeddingInput) -> Result<EmbeddingRequest> {
         let embedding_request = EmbeddingRequestBuilder::default()
-            .model("text-embedding-ada-002".to_string())
+            .url(self.api_base())
             .input(input)
-            .user(None)
             .build().context("Failed to build embedding request")?;
         Ok(embedding_request)
     }
@@ -253,8 +229,6 @@ impl Client {
 
 		let request = reqwest::Client::new()
             .post(&url)
-            .bearer_auth(self.api_key())
-            .headers(self.headers())
             .json(&request)
             .build()?;
 
