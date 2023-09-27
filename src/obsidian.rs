@@ -9,18 +9,18 @@ extern "C" {
     #[wasm_bindgen(method, getter)]
     pub fn app(this: &Plugin) -> App;
     #[wasm_bindgen(method, getter)]
-    pub fn settings(this: &Plugin) -> semanticSearchSettings;
+    pub fn settings(this: &Plugin) -> SemanticSearchSettings;
 
-    pub type semanticSearchSettings;
+    pub type SemanticSearchSettings;
 
     #[wasm_bindgen(method, getter)]
-    pub fn apiKey(this: &semanticSearchSettings) -> String;
+    pub fn apiKey(this: &SemanticSearchSettings) -> String;
     #[wasm_bindgen(method, getter)]
-    pub fn ignoredFolders(this: &semanticSearchSettings) -> String;
+    pub fn ignoredFolders(this: &SemanticSearchSettings) -> String;
     #[wasm_bindgen(method, getter)]
-    pub fn sectionDelimeterRegex(this: &semanticSearchSettings) -> String;
+    pub fn sectionDelimeterRegex(this: &SemanticSearchSettings) -> String;
     #[wasm_bindgen(method, getter)]
-    pub fn numBatches(this: &semanticSearchSettings) -> u32;
+    pub fn numBatches(this: &SemanticSearchSettings) -> u32;
 
     #[derive(Clone)]
     pub type App;

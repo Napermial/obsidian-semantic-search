@@ -1,16 +1,16 @@
-use log::debug;
-use regex::Regex;
-use log::error;
-use wasm_bindgen::prelude::*;
 use lazy_static::lazy_static;
+use log::debug;
+use log::error;
+use regex::Regex;
+use wasm_bindgen::prelude::*;
 
-use crate::FileProcessor;
-use crate::SemanticSearchError;
-use crate::Notice;
 use crate::file_processor::InputRow;
 use crate::obsidian;
 use crate::obsidian::App;
-use crate::obsidian::semanticSearchSettings;
+use crate::obsidian::SemanticSearchSettings;
+use crate::FileProcessor;
+use crate::Notice;
+use crate::SemanticSearchError;
 
 #[wasm_bindgen]
 pub struct GenerateInputCommand {
@@ -22,30 +22,34 @@ pub struct GenerateInputCommand {
 #[wasm_bindgen]
 impl GenerateInputCommand {
     #[wasm_bindgen(constructor)]
-    pub fn new(app: App, settings: semanticSearchSettings) -> GenerateInputCommand {
+    pub fn new(app: App, settings: SemanticSearchSettings) -> GenerateInputCommand {
         let file_processor = FileProcessor::new(app.vault());
         let ignored_folders = settings.ignoredFolders();
         let section_delimeter_regex = settings.sectionDelimeterRegex();
 
-        GenerateInputCommand { file_processor, ignored_folders, section_delimeter_regex}
+        GenerateInputCommand {
+            file_processor,
+            ignored_folders,
+            section_delimeter_regex,
+        }
     }
 
     pub async fn callback(&self) {
-		let data: Vec<InputRow>;
+        let data: Vec<InputRow>;
         match self.generate_input().await {
-			Ok(input) => data = input,
-			Err(e) => {
-				Notice::new(&format!("An error occurred generating inputs: {}", e));
-				error!("{:?}", e);
-				return;
-			}
-		}
-		debug!("Deleting input.csv");
+            Ok(input) => data = input,
+            Err(e) => {
+                Notice::new(&format!("An error occurred generating inputs: {}", e));
+                error!("{:?}", e);
+                return;
+            }
+        }
+        debug!("Deleting input.csv");
         match self.file_processor.delete_input().await {
             Ok(()) => (),
             Err(e) => error!("{:?}", e),
         }
-		debug!("Writing input.csv");
+        debug!("Writing input.csv");
         match self.file_processor.write_input_csv(data).await {
             Ok(()) => (),
             Err(e) => error!("{:?}", e),
@@ -55,26 +59,41 @@ impl GenerateInputCommand {
     }
 
     async fn generate_input(&self) -> Result<Vec<InputRow>, SemanticSearchError> {
-        let files = self.file_processor.get_vault_markdown_files(self.ignored_folders.clone());
-		debug!("Found {} files", files.len());
-		let mut folded_input: Vec<InputRow> = Vec::new();
+        let files = self
+            .file_processor
+            .get_vault_markdown_files(self.ignored_folders.clone());
+        debug!("Found {} files", files.len());
+        let mut folded_input: Vec<InputRow> = Vec::new();
         for file in files {
             let mut extracted = self.process_file(file).await.unwrap();
-			folded_input.append(&mut extracted);
+            folded_input.append(&mut extracted);
         }
         Ok(folded_input)
     }
 
-    async fn process_file(&self, file: obsidian::TFile) -> Result<Vec<InputRow>, SemanticSearchError> {
+    async fn process_file(
+        &self,
+        file: obsidian::TFile,
+    ) -> Result<Vec<InputRow>, SemanticSearchError> {
         let name = file.name();
-		let mtime = file.stat().mtime();
+        let mtime = file.stat().mtime();
         let text = self.file_processor.read_from_file(file).await?;
-		let sections = extract_sections(&name, &mtime.to_string(), &text, &self.section_delimeter_regex)?;
-		Ok(sections)
-	}
+        let sections = extract_sections(
+            &name,
+            &mtime.to_string(),
+            &text,
+            &self.section_delimeter_regex,
+        )?;
+        Ok(sections)
+    }
 }
 
-fn extract_sections(name: &str, mtime: &str, text: &str, delimeter: &str) -> Result<Vec<InputRow>, SemanticSearchError> {
+fn extract_sections(
+    name: &str,
+    mtime: &str,
+    text: &str,
+    delimeter: &str,
+) -> Result<Vec<InputRow>, SemanticSearchError> {
     let mut output: Vec<InputRow> = Vec::new();
     let mut lines = text.lines().peekable();
     let re = match Regex::new(delimeter) {
@@ -82,38 +101,48 @@ fn extract_sections(name: &str, mtime: &str, text: &str, delimeter: &str) -> Res
         Err(_) => {
             Notice::new("Invalid regex used, defaulting to '.'");
             Regex::new(".").unwrap()
-        },
+        }
     };
     let mut section_header = "".to_string();
     let mut body = String::new();
     while let Some(line) = lines.next() {
         if re.is_match(&line) {
             if !(section_header.trim().is_empty() && body.trim().is_empty()) {
-				let section_text = clean_text(&section_header);
-				let body_text = clean_text(&body);
-				if !(section_text.is_empty() && body_text.is_empty()) {
-					output.push(InputRow { name: name.to_string(), mtime: mtime.to_string(), section: section_text, body: body_text});
-				}
-			}
-			section_header = line.to_string();
-			body = line.to_string();
-		} else {
-			if section_header.is_empty() {
-				section_header = line.to_string();
-			}
-			let cleaned_line = clean_text(line);
-			if !cleaned_line.is_empty() {
-				body.push_str(&" ");
-				body.push_str(&cleaned_line);
-			}
-		}
-		if lines.peek().is_none() && !(section_header.trim().is_empty() && body.trim().is_empty()) {
-			let section_text = clean_text(&section_header);
-			let body_text = clean_text(&body);
-			if !(section_text.is_empty() && body_text.is_empty()) {
-				output.push(InputRow { name: name.to_string(), mtime: mtime.to_string(), section: section_text, body: body_text});
-			}
-		}
+                let section_text = clean_text(&section_header);
+                let body_text = clean_text(&body);
+                if !(section_text.is_empty() && body_text.is_empty()) {
+                    output.push(InputRow {
+                        name: name.to_string(),
+                        mtime: mtime.to_string(),
+                        section: section_text,
+                        body: body_text,
+                    });
+                }
+            }
+            section_header = line.to_string();
+            body = line.to_string();
+        } else {
+            if section_header.is_empty() {
+                section_header = line.to_string();
+            }
+            let cleaned_line = clean_text(line);
+            if !cleaned_line.is_empty() {
+                body.push_str(&" ");
+                body.push_str(&cleaned_line);
+            }
+        }
+        if lines.peek().is_none() && !(section_header.trim().is_empty() && body.trim().is_empty()) {
+            let section_text = clean_text(&section_header);
+            let body_text = clean_text(&body);
+            if !(section_text.is_empty() && body_text.is_empty()) {
+                output.push(InputRow {
+                    name: name.to_string(),
+                    mtime: mtime.to_string(),
+                    section: section_text,
+                    body: body_text,
+                });
+            }
+        }
     }
     Ok(output)
 }
@@ -140,7 +169,6 @@ fn remove_links(text: &str) -> String {
     let res = LINK_REGEX.replace_all(input, "");
     res.to_string()
 }
-    
 
 #[cfg(test)]
 mod tests {
@@ -160,18 +188,18 @@ mod tests {
         assert_eq!(res.get(0).unwrap().body, "Test");
     }
 
-	#[test]
-	fn empty_section() {
+    #[test]
+    fn empty_section() {
         let text = " ";
         let section_delimeter = r".";
 
         let res = extract_sections(NAME, &" ", text, &section_delimeter).unwrap();
 
         assert_eq!(res.len(), 0);
-	}
+    }
 
-	#[test]
-	fn empty_section_inbetween() {
+    #[test]
+    fn empty_section_inbetween() {
         let text = "Test\n \nTest2\n ";
         let section_delimeter = r".";
 
@@ -182,7 +210,7 @@ mod tests {
         assert_eq!(res.get(0).unwrap().body, "Test");
         assert_eq!(res.get(1).unwrap().section, "Test2");
         assert_eq!(res.get(1).unwrap().body, "Test2");
-	}
+    }
 
     #[test]
     fn empty_body() {
@@ -265,7 +293,10 @@ mod tests {
         assert_eq!(res.len(), 2);
         assert_eq!(res.get(1).unwrap().name, "test");
         assert_eq!(res.get(1).unwrap().section, "Test3");
-        assert_eq!(res.get(1).unwrap().body, "Test3 content3 Test4 content4 Test5 content5 Test6 content6");
+        assert_eq!(
+            res.get(1).unwrap().body,
+            "Test3 content3 Test4 content4 Test5 content5 Test6 content6"
+        );
     }
 
     #[test]
@@ -329,7 +360,10 @@ Guarantees reliability only if sender is correct
         assert_eq!(res.len(), 2);
         assert_eq!(res.get(0).unwrap().name, "test");
         assert_eq!(res.get(0).unwrap().section, "Unreliable Broadcast");
-        assert_eq!(res.get(0).unwrap().body, "Unreliable Broadcast Does not guarantee anything. Such events are allowed:");
+        assert_eq!(
+            res.get(0).unwrap().body,
+            "Unreliable Broadcast Does not guarantee anything. Such events are allowed:"
+        );
         assert_eq!(res.get(1).unwrap().name, "test");
         assert_eq!(res.get(1).unwrap().section, "Best Effort Broadcast");
         assert_eq!(res.get(1).unwrap().body, "Best Effort Broadcast Guarantees reliability only if sender is correct \
